@@ -72,6 +72,11 @@ resource "aws_iam_role_policy" "worker_access" {
         Effect   = "Allow"
         Action   = ["dynamodb:PutItem"]
         Resource = aws_dynamodb_table.audit_events.arn
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["s3:PutObject"]
+        Resource = "${aws_s3_bucket.audit_archive.arn}/*"
       }
     ]
   })

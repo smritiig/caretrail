@@ -5,7 +5,7 @@ from botocore.exceptions import ClientError
 
 from src.models.audit_event import AuditEvent
 
-
+from src.services.hashing import calculate_event_hash
 def save_audit_event(
     audit_event: AuditEvent,
     table_name: str,
@@ -15,6 +15,7 @@ def save_audit_event(
     table = dynamodb.Table(table_name)
 
     item = audit_event.model_dump(mode="json")
+    item["event_hash"] = calculate_event_hash(audit_event)
 
     try:
         table.put_item(

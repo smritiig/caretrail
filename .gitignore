@@ -6,3 +6,17 @@ __pycache__/
 .terraform/
 *.tfstate
 *.tfstate.*
+tfplan
+*.tfplan
+build/
+lambda-plan
+response.json
+# Local AWS test payloads
+/dynamodb-key.json
+/test-event.json
+/infrastructure/terraform/*-key.json
+/infrastructure/terraform/*-response.json
+/infrastructure/terraform/*-event.json
+
+# Saved Terraform plans
+/infrastructure/terraform/*-plan

@@ -24,21 +24,33 @@ def create_sqs_record(message_id: str, body: dict) -> dict:
 
 
 @pytest.fixture(autouse=True)
-def configure_table(monkeypatch):
+def configure_worker(monkeypatch):
     monkeypatch.setenv(
         "AUDIT_TABLE_NAME",
         "caretrail-audit-events",
+    )
+    monkeypatch.setenv(
+        "AUDIT_BUCKET_NAME",
+        "caretrail-audit-archive",
     )
 
 
 def test_valid_message_is_processed(monkeypatch):
     captured = {}
 
+    def fake_archive(audit_event, bucket_name):
+        captured["bucket_name"] = bucket_name
+        return "audit-events/2026/09/20/evt-1001.json"
+
     def fake_save(audit_event, table_name):
         captured["event"] = audit_event
         captured["table_name"] = table_name
         return True
 
+    monkeypatch.setattr(
+        "src.handlers.process_event.archive_audit_event",
+        fake_archive,
+    )
     monkeypatch.setattr(
         "src.handlers.process_event.save_audit_event",
         fake_save,
@@ -58,6 +70,7 @@ def test_valid_message_is_processed(monkeypatch):
     assert response == {"batchItemFailures": []}
     assert captured["event"].event_id == "evt-1001"
     assert captured["table_name"] == "caretrail-audit-events"
+    assert captured["bucket_name"] == "caretrail-audit-archive"
 
 
 def test_invalid_message_is_reported_as_failed():
@@ -85,9 +98,16 @@ def test_invalid_message_is_reported_as_failed():
 
 
 def test_only_failed_message_is_retried(monkeypatch):
+    def fake_archive(audit_event, bucket_name):
+        return "audit-events/2026/09/20/evt-1001.json"
+
     def fake_save(audit_event, table_name):
         return True
 
+    monkeypatch.setattr(
+        "src.handlers.process_event.archive_audit_event",
+        fake_archive,
+    )
     monkeypatch.setattr(
         "src.handlers.process_event.save_audit_event",
         fake_save,
@@ -122,6 +142,13 @@ def test_only_failed_message_is_retried(monkeypatch):
 
 def test_missing_table_configuration_raises_error(monkeypatch):
     monkeypatch.delenv("AUDIT_TABLE_NAME")
+
+    with pytest.raises(RuntimeError):
+        lambda_handler({"Records": []}, None)
+
+
+def test_missing_bucket_configuration_raises_error(monkeypatch):
+    monkeypatch.delenv("AUDIT_BUCKET_NAME")
 
     with pytest.raises(RuntimeError):
         lambda_handler({"Records": []}, None)

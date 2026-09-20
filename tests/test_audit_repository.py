@@ -3,7 +3,7 @@ from moto import mock_aws
 
 from src.models.audit_event import AuditEvent
 from src.repositories.audit_repository import save_audit_event
-
+from src.services.hashing import calculate_event_hash
 
 TABLE_NAME = "caretrail-audit-events"
 
@@ -59,6 +59,9 @@ def test_save_audit_event():
     assert stored_item["actor_id"] == "doctor-27"
     assert stored_item["patient_id"] == "patient-104"
     assert stored_item["outcome"] == "SUCCESS"
+    assert stored_item["event_hash"] == calculate_event_hash(
+    valid_audit_event()
+)
 
 
 @mock_aws

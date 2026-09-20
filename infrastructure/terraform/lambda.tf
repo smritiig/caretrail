@@ -52,7 +52,8 @@ resource "aws_lambda_function" "worker" {
 
   environment {
     variables = {
-      AUDIT_TABLE_NAME = aws_dynamodb_table.audit_events.name
+      AUDIT_TABLE_NAME  = aws_dynamodb_table.audit_events.name
+      AUDIT_BUCKET_NAME = aws_s3_bucket.audit_archive.id
     }
   }
 
