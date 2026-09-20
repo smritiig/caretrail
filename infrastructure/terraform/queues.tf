@@ -8,12 +8,12 @@ resource "aws_sqs_queue" "audit_dlq" {
 resource "aws_sqs_queue" "audit_queue" {
   name = "${var.project_name}-audit-events"
 
-  visibility_timeout_seconds = 30
+  visibility_timeout_seconds = 181
   message_retention_seconds  = 345600
   sqs_managed_sse_enabled    = true
 
   redrive_policy = jsonencode({
     deadLetterTargetArn = aws_sqs_queue.audit_dlq.arn
-    maxReceiveCount     = 3
+    maxReceiveCount     = 5
   })
 }
