@@ -3,6 +3,7 @@ import json
 import pytest
 
 from src.handlers.process_event import lambda_handler
+from src.services.archive import ArchiveResult
 
 
 def valid_message_body() -> dict:
@@ -40,11 +41,21 @@ def test_valid_message_is_processed(monkeypatch):
 
     def fake_archive(audit_event, bucket_name):
         captured["bucket_name"] = bucket_name
-        return "audit-events/2026/09/20/evt-1001.json"
+        return ArchiveResult(
+            object_key="audit-events/2026/09/20/evt-1001.json",
+            version_id="version-123",
+        )
 
-    def fake_save(audit_event, table_name):
+    def fake_save(
+        audit_event,
+        table_name,
+        archive_key,
+        archive_version_id,
+    ):
         captured["event"] = audit_event
         captured["table_name"] = table_name
+        captured["archive_key"] = archive_key
+        captured["archive_version_id"] = archive_version_id
         return True
 
     monkeypatch.setattr(
@@ -71,6 +82,10 @@ def test_valid_message_is_processed(monkeypatch):
     assert captured["event"].event_id == "evt-1001"
     assert captured["table_name"] == "caretrail-audit-events"
     assert captured["bucket_name"] == "caretrail-audit-archive"
+    assert captured["archive_key"] == (
+        "audit-events/2026/09/20/evt-1001.json"
+    )
+    assert captured["archive_version_id"] == "version-123"
 
 
 def test_invalid_message_is_reported_as_failed():
@@ -99,9 +114,17 @@ def test_invalid_message_is_reported_as_failed():
 
 def test_only_failed_message_is_retried(monkeypatch):
     def fake_archive(audit_event, bucket_name):
-        return "audit-events/2026/09/20/evt-1001.json"
+        return ArchiveResult(
+            object_key="audit-events/2026/09/20/evt-1001.json",
+            version_id="version-123",
+        )
 
-    def fake_save(audit_event, table_name):
+    def fake_save(
+        audit_event,
+        table_name,
+        archive_key,
+        archive_version_id,
+    ):
         return True
 
     monkeypatch.setattr(

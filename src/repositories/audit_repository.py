@@ -4,11 +4,14 @@ import boto3
 from botocore.exceptions import ClientError
 
 from src.models.audit_event import AuditEvent
-
 from src.services.hashing import calculate_event_hash
+
+
 def save_audit_event(
     audit_event: AuditEvent,
     table_name: str,
+    archive_key: str,
+    archive_version_id: str,
     dynamodb_resource: Any = None,
 ) -> bool:
     dynamodb = dynamodb_resource or boto3.resource("dynamodb")
@@ -16,6 +19,8 @@ def save_audit_event(
 
     item = audit_event.model_dump(mode="json")
     item["event_hash"] = calculate_event_hash(audit_event)
+    item["archive_key"] = archive_key
+    item["archive_version_id"] = archive_version_id
 
     try:
         table.put_item(

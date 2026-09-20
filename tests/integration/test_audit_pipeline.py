@@ -39,6 +39,12 @@ def test_complete_audit_pipeline(monkeypatch):
     queue_url = queue["QueueUrl"]
 
     s3.create_bucket(Bucket=BUCKET_NAME)
+    s3.put_bucket_versioning(
+        Bucket=BUCKET_NAME,
+        VersioningConfiguration={
+            "Status": "Enabled",
+        },
+    )
 
     table = dynamodb.create_table(
         TableName=TABLE_NAME,
@@ -109,9 +115,15 @@ def test_complete_audit_pipeline(monkeypatch):
     assert stored_item["action"] == "PATIENT_RECORD_VIEWED"
     assert stored_item["outcome"] == "SUCCESS"
 
+    assert stored_item["archive_key"] == (
+        "audit-events/2026/09/20/evt-1001.json"
+    )
+    assert stored_item["archive_version_id"]
+
     archived_object = s3.get_object(
         Bucket=BUCKET_NAME,
-        Key="audit-events/2026/09/20/evt-1001.json",
+        Key=stored_item["archive_key"],
+        VersionId=stored_item["archive_version_id"],
     )
 
     archived_event = json.loads(
@@ -120,4 +132,4 @@ def test_complete_audit_pipeline(monkeypatch):
 
     assert archived_event["event_id"] == "evt-1001"
     assert archived_event["actor_id"] == "doctor-27"
-    assert len(archived_event["event_hash"]) == 64
+    assert archived_event["event_hash"] == stored_item["event_hash"]

@@ -5,7 +5,10 @@ from src.models.audit_event import AuditEvent
 from src.repositories.audit_repository import save_audit_event
 from src.services.hashing import calculate_event_hash
 
+
 TABLE_NAME = "caretrail-audit-events"
+ARCHIVE_KEY = "audit-events/2026/09/20/evt-1001.json"
+ARCHIVE_VERSION_ID = "version-123"
 
 
 def valid_audit_event() -> AuditEvent:
@@ -48,6 +51,8 @@ def test_save_audit_event():
     inserted = save_audit_event(
         audit_event=valid_audit_event(),
         table_name=TABLE_NAME,
+        archive_key=ARCHIVE_KEY,
+        archive_version_id=ARCHIVE_VERSION_ID,
         dynamodb_resource=dynamodb,
     )
 
@@ -60,8 +65,10 @@ def test_save_audit_event():
     assert stored_item["patient_id"] == "patient-104"
     assert stored_item["outcome"] == "SUCCESS"
     assert stored_item["event_hash"] == calculate_event_hash(
-    valid_audit_event()
-)
+        valid_audit_event()
+    )
+    assert stored_item["archive_key"] == ARCHIVE_KEY
+    assert stored_item["archive_version_id"] == ARCHIVE_VERSION_ID
 
 
 @mock_aws
@@ -73,12 +80,16 @@ def test_duplicate_event_is_not_inserted_twice():
     first_result = save_audit_event(
         audit_event=event,
         table_name=TABLE_NAME,
+        archive_key=ARCHIVE_KEY,
+        archive_version_id=ARCHIVE_VERSION_ID,
         dynamodb_resource=dynamodb,
     )
 
     second_result = save_audit_event(
         audit_event=event,
         table_name=TABLE_NAME,
+        archive_key=ARCHIVE_KEY,
+        archive_version_id=ARCHIVE_VERSION_ID,
         dynamodb_resource=dynamodb,
     )
 

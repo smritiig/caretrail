@@ -26,7 +26,7 @@ def lambda_handler(event: dict, context: Any) -> dict:
             message_body = json.loads(record["body"])
             audit_event = AuditEvent.model_validate(message_body)
 
-            archive_audit_event(
+            archive_result = archive_audit_event(
                 audit_event=audit_event,
                 bucket_name=bucket_name,
             )
@@ -34,6 +34,8 @@ def lambda_handler(event: dict, context: Any) -> dict:
             save_audit_event(
                 audit_event=audit_event,
                 table_name=table_name,
+                archive_key=archive_result.object_key,
+                archive_version_id=archive_result.version_id,
             )
 
         except Exception:
