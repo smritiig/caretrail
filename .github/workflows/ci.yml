@@ -1,0 +1,61 @@
+name: CareTrail CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-validate:
+    name: Test and validate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Run tests
+        run: python -m pytest
+
+      - name: Build Lambda deployment package
+        run: |
+          mkdir -p build/lambda
+          python -m pip install \
+            --target build/lambda \
+            -r requirements.txt
+          cp -r src build/lambda/src
+          cd build/lambda
+          zip -r ../caretrail-lambda.zip .
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.16.2"
+
+      - name: Check Terraform formatting
+        working-directory: infrastructure/terraform
+        run: terraform fmt -check
+
+      - name: Initialize Terraform
+        working-directory: infrastructure/terraform
+        run: terraform init -backend=false
+
+      - name: Validate Terraform
+        working-directory: infrastructure/terraform
+        run: terraform validate
