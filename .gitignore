@@ -19,4 +19,7 @@ response.json
 /infrastructure/terraform/*-event.json
 
 # Saved Terraform plans
-/infrastructure/terraform/*-plan
+/infrastructure/terraform/*-planbenchmark-results.json
+infrastructure/terraform/*-plan
+benchmark-*.json
+*.crdownload

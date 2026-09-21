@@ -137,6 +137,67 @@ The message:
 
 This demonstrates that malformed events are isolated without blocking valid messages or silently corrupting the ledger.
 
+## Load-test results
+
+CareTrail was tested end to end against the deployed AWS environment in `us-east-2` using synthetic audit events.
+
+The load generator is written in Python and records accepted requests, throttles, failures, achieved throughput, and latency percentiles.
+
+| Scenario | Traffic | Accepted | Success rate | p50 | p95 | p99 |
+|---|---:|---:|---:|---:|---:|---:|
+| Warm pilot | 100 events at 10 req/s | 100 | 100.00% | 246 ms | 348 ms | 373 ms |
+| Steady load | 6,000 events at 10 req/s | 5,998 | 99.97% | 241 ms | 303 ms | 359 ms |
+| Peak load | 3,000 events at 25 req/s | 2,953 | 98.43% | 228 ms | 270 ms | 507 ms |
+| Spike test | 1,000 events targeting 100 req/s | 771 | 77.10% | 1,490 ms | 2,949 ms | 3,833 ms |
+
+The steady test sustained 10 requests per second for 10 minutes. Two requests encountered client-side transport errors; CareTrail returned no throttling responses during that run.
+
+During the peak test, the ingestion rate exceeded worker throughput. SQS buffered approximately 2,300 events, the worker drained the backlog, and the dead-letter queue remained empty.
+
+![SQS backlog increasing and recovering to zero](docs/images/sqs-backlog-recovery.png)
+
+### Bottleneck identified
+
+The deployed AWS account has a regional Lambda concurrency quota of 10. The ingestion and worker functions share that quota.
+
+At higher traffic levels:
+
+- The peak test produced 47 ingestion Lambda throttles.
+- The spike test produced 229 ingestion Lambda throttles.
+- API Gateway returned corresponding `503` integration responses.
+- The spike generator completed approximately 37.7 requests per second.
+- Accepted messages remained protected by SQS and were eventually processed.
+- The main queue returned to zero.
+- The dead-letter queue remained empty.
+
+![Ingestion Lambda throttles during peak and spike tests](docs/images/lambda-ingestion-throttles.png)
+
+This established the first scaling bottleneck as the AWS account concurrency quota rather than an unhandled application exception. A production deployment would request a higher regional quota and assign reserved concurrency between ingestion and worker functions.
+
+For testing, API Gateway was temporarily configured for a target rate of 50 requests per second and a burst capacity of 100. After the tests, it was restored to the normal target rate of 2 requests per second and burst capacity of 5.
+
+These results represent one portfolio-scale AWS deployment with small synthetic payloads. They are not presented as universal production-capacity guarantees.
+
+### Running the load generator
+
+Set the API URL and a valid Cognito ID token in environment variables:
+
+```powershell
+$env:CARETRAIL_API_URL = "https://your-api-id.execute-api.us-east-2.amazonaws.com"
+$env:CARETRAIL_TOKEN = "your-temporary-cognito-id-token"
+```
+
+Run a controlled test:
+
+```powershell
+python scripts\load_test.py `
+  --requests 100 `
+  --rate 10 `
+  --workers 20
+```
+
+The script limits a run to 25,000 requests and refuses to start when the Cognito token will expire before the expected completion time. Tokens and passwords are never stored in benchmark result files.
+
 ## Technology stack
 
 | Area | Technology |
@@ -160,8 +221,12 @@ This demonstrates that malformed events are isolated without blocking valid mess
 ```text
 caretrail/
 ├── .github/workflows/       # Continuous integration
+├── docs/
+│   └── images/              # Benchmark evidence
 ├── infrastructure/
 │   └── terraform/           # AWS infrastructure
+├── scripts/
+│   └── load_test.py         # Controlled authenticated load generator
 ├── src/
 │   ├── handlers/            # Lambda entry points
 │   ├── models/              # Pydantic domain models
